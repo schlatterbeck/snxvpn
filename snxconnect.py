@@ -23,7 +23,7 @@ class HTML_Requester (object) :
 
     def open (self, filepart = None, data = None) :
         filepart = filepart or self.nextfile
-        url = '/'.join (('https:/', self.args.host, self.args.file))
+        url = '/'.join (('%s:/' % self.args.protocol, self.args.host, filepart))
         rq = urllib2.Request (url, data)
         f  = self.opener.open (rq, timeout = 10)
         self.soup = BeautifulSoup (f)
@@ -36,7 +36,7 @@ class HTML_Requester (object) :
         forms = self.soup.find_all ('form')
         for form in forms :
             if 'id' in form.attrs and form ['id'] == 'loginForm' :
-                self.nextfile = form ['action']
+                self.nextfile = form ['action'].lstrip ('/')
                 assert form ['method'] == 'post'
                 break
         print self.nextfile
@@ -56,62 +56,6 @@ class HTML_Requester (object) :
     # end def login
 
 # end class HTML_Requester
-
-def main () :
-    cmd = ArgumentParser ()
-    cmd.add_argument \
-        ( '-F', '--file'
-        , help    = 'File part of URL default=%(default)s'
-        , default = 'sslvpn'
-        )
-    cmd.add_argument \
-        ( '-H', '--host'
-        , help    = 'Host part of URL default=%(default)s'
-        , default = 'snx.lfrz.at'
-        )
-    cmd.add_argument \
-        ( '--height-data'
-        , help    = 'Height data in form, default empty'
-        , default = ''
-        )
-    cmd.add_argument \
-        ( '-L', '--login-type'
-        , help    = 'Login type, default=%(default)s'
-        , default = 'Standard'
-        )
-    cmd.add_argument \
-        ( '-p', '--password'
-        , help    = 'Login password, not a good idea to specify on commandline'
-        )
-    cmd.add_argument \
-        ( '-R', '--realm'
-        , help    = 'Selected realm, default=%(default)s'
-        , default = 'ssl_vpn'
-        )
-    cmd.add_argument \
-        ( '-U', '--username'
-        , help    = 'Login username'
-        )
-    cmd.add_argument \
-        ( '-V', '--vpid-prefix'
-        , help    = 'VPID prefix, default empty'
-        , default = ''
-        )
-    args = cmd.parse_args ()
-    if not args.username or not args.password :
-        n = netrc ()
-        a = n.authenticators (args.host)
-        if a :
-            un, dummy, pw = a
-            if not args.username :
-                args.username = un
-            if not args.password :
-                args.password = pw
-        if 'password' not in args :
-            password = getpass ('Password: ')
-    rq = HTML_Requester (args)
-    rq.login ()
-# end def main ()
 
 class PW_Encode (object) :
     """ RSA encryption module with special padding and reversing to be
@@ -168,6 +112,67 @@ class PW_Encode (object) :
     # end def encrypt
 
 # end class PW_Encode
+
+def main () :
+    cmd = ArgumentParser ()
+    cmd.add_argument \
+        ( '-F', '--file'
+        , help    = 'File part of URL default=%(default)s'
+        , default = 'sslvpn'
+        )
+    cmd.add_argument \
+        ( '-H', '--host'
+        , help    = 'Host part of URL default=%(default)s'
+        , default = 'snx.lfrz.at'
+        )
+    cmd.add_argument \
+        ( '--height-data'
+        , help    = 'Height data in form, default empty'
+        , default = ''
+        )
+    cmd.add_argument \
+        ( '-L', '--login-type'
+        , help    = 'Login type, default=%(default)s'
+        , default = 'Standard'
+        )
+    cmd.add_argument \
+        ( '-P', '--password'
+        , help    = 'Login password, not a good idea to specify on commandline'
+        )
+    cmd.add_argument \
+        ( '-p', '--protocol'
+        , help    = 'http or https, should *always* be https except for tests'
+        , default = 'https'
+        )
+    cmd.add_argument \
+        ( '-R', '--realm'
+        , help    = 'Selected realm, default=%(default)s'
+        , default = 'ssl_vpn'
+        )
+    cmd.add_argument \
+        ( '-U', '--username'
+        , help    = 'Login username'
+        )
+    cmd.add_argument \
+        ( '-V', '--vpid-prefix'
+        , help    = 'VPID prefix, default empty'
+        , default = ''
+        )
+    args = cmd.parse_args ()
+    if not args.username or not args.password :
+        n = netrc ()
+        a = n.authenticators (args.host)
+        if a :
+            un, dummy, pw = a
+            if not args.username :
+                args.username = un
+            if not args.password :
+                args.password = pw
+        if 'password' not in args :
+            password = getpass ('Password: ')
+    rq = HTML_Requester (args)
+    rq.login ()
+# end def main ()
 
 if __name__ == '__main__' :
     main ()
