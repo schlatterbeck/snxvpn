@@ -4,7 +4,7 @@ import os
 import sys
 import urllib2
 from rsclib.HTML_Parse import Page_Tree
-from cookielib         import CookieJar
+from cookielib         import LWPCookieJar
 from bs4               import BeautifulSoup
 from getpass           import getpass
 from urllib            import urlencode
@@ -12,11 +12,23 @@ from argparse          import ArgumentParser
 from netrc             import netrc
 from Crypto.PublicKey  import RSA
 
+""" Todo:
+    - timeout can be retrieved at /sslvpn/Portal/LoggedIn
+      Function to do this is RetrieveTimeoutVal (url_above) in portal
+      This seems to be in seconds. But my portal always displays
+      "nNextTimeout = 6;" content-type is text/javascript.
+    - first location is /sslvpn/Login/Login, spares some redirects
+    - We may want to get the RSA parameters from the javascript in the
+      received html, RSA pubkey will probably be different for different
+      deployments.
+    - Log debug logs to syslog
+"""
+
 class HTML_Requester (object) :
 
     def __init__ (self, args) :
         self.args     = args
-        self.jar      = j = CookieJar ()
+        self.jar      = j = LWPCookieJar ()
         self.opener   = urllib2.build_opener (urllib2.HTTPCookieProcessor (j))
         self.nextfile = args.file
     # end def __init__
@@ -68,9 +80,15 @@ class HTML_Requester (object) :
         d ['password'] = enc.encrypt (otp)
         self.debug (self.nextfile)
         self.open (data = urlencode (d))
+        if not self.purl.endswith ('Portal/Main') :
+            print "Login failed"
+            self.debug ("Login failed")
+            return
         self.debug (self.purl)
         self.debug (self.info)
-        self.debug (self.soup.prettify ())
+        self.jar.save ('cookies', ignore_discard = True, ignore_expires = True)
+        self.open  ('sslvpn/SNX/extender')
+        print self.soup.prettify ()
     # end def login
 
     def parse_pw_response (self) :
