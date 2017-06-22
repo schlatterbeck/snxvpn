@@ -27,9 +27,14 @@ class HTML_Requester (object) :
         rq = urllib2.Request (url, data)
         f  = self.opener.open (rq, timeout = 10)
         self.soup = BeautifulSoup (f)
-        #purl  = f.geturl ()
-        #pinfo = f.info ()
+        self.purl = f.geturl ()
+        self.info = f.info ()
     # end def open
+
+    def debug (self, s) :
+        if self.args.debug :
+            print s
+    # end def debug
 
     def login (self) :
         self.open ()
@@ -39,7 +44,7 @@ class HTML_Requester (object) :
                 self.nextfile = form ['action'].lstrip ('/')
                 assert form ['method'] == 'post'
                 break
-        print self.nextfile
+        self.debug (self.nextfile)
         # FIXME: We may want to get the RSA parameters from the
         #        javascript in the received html
         enc = PW_Encode ()
@@ -52,8 +57,40 @@ class HTML_Requester (object) :
             , HeightData    = self.args.height_data
             )
         self.open (data = urlencode (d))
-        print self.soup.prettify ()
+        self.debug (self.purl)
+        self.debug (self.info)
+        if 'MultiChallenge' not in self.purl :
+            print "Login failed"
+            self.debug ("Login failed")
+            return
+        d = self.parse_pw_response ()
+        otp = getpass ('One-time Password: ')
+        d ['password'] = enc.encrypt (otp)
+        self.debug (self.nextfile)
+        self.open (data = urlencode (d))
+        self.debug (self.purl)
+        self.debug (self.info)
+        self.debug (self.soup.prettify ())
     # end def login
+
+    def parse_pw_response (self) :
+        forms = self.soup.find_all ('form')
+        for form in forms :
+            if 'name' in form.attrs and form ['name'] == 'MCForm' :
+                self.nextfile = form ['action'].lstrip ('/')
+                assert form ['method'] == 'post'
+                break
+        d = {}
+        for input in form.find_all ('input') :
+            if input.attrs.get ('type') == 'password' :
+                continue
+            if 'name' not in input.attrs :
+                continue
+            if input ['name'] in ('password', 'btnCancel') :
+                continue
+            d [input ['name']] = input.attrs.get ('value', '')
+        return d
+    # end def parse_pw_response
 
 # end class HTML_Requester
 
@@ -115,6 +152,12 @@ class PW_Encode (object) :
 
 def main () :
     cmd = ArgumentParser ()
+    cmd.add_argument \
+        ( '-D', '--debug'
+        , help    = 'Debug handshake'
+        , action  = 'store_true'
+        , default = True
+        )
     cmd.add_argument \
         ( '-F', '--file'
         , help    = 'File part of URL default=%(default)s'
