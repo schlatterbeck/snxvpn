@@ -7,9 +7,11 @@ import socket
 try :
     from urllib2 import build_opener, HTTPCookieProcessor, Request
     from urllib  import urlencode
+    rsatype = long
 except ImportError :
     from urllib.request import build_opener, HTTPCookieProcessor, Request
     from urllib.parse   import urlencode
+    rsatype = int
 try :
     from cookielib import LWPCookieJar
 except ImportError :
@@ -27,7 +29,6 @@ from subprocess        import Popen, PIPE
       Function to do this is RetrieveTimeoutVal (url_above) in portal
       This seems to be in seconds. But my portal always displays
       "nNextTimeout = 6;" content-type is text/javascript.
-    - first location is /sslvpn/Login/Login, spares some redirects
     - We may want to get the RSA parameters from the javascript in the
       received html, RSA pubkey will probably be different for different
       deployments.
@@ -108,15 +109,42 @@ class HTML_Requester (object) :
 
     def login (self) :
         self.open ()
+        # Get the RSA parameters from the javascript in the received html
+        for script in self.soup.find_all ('script') :
+            if 'RSA' in script.attrs.get ('src', '') :
+                self.next_file (script ['src'])
+                self.debug (self.nextfile)
+                break
+        else :
+            print ('No RSA javascript file found, cannot login')
+            return
+        self.open (do_soup = False)
+        keys = ('modulus', 'exponent')
+        vars = {}
+        for line in self.f :
+            for k in keys :
+                if 'var %s' % k in line :
+                    val = line.strip ().rstrip (';')
+                    val = val.split ('=', 1) [-1]
+                    val = val.strip ().strip ("'")
+                    vars [k] = val
+                    break
+            if len (vars) == 2 :
+                break
+        else :
+            print ('No RSA parameters found, cannot login')
+            return
+        self.debug (repr (vars))
+        self.modulus  = rsatype (vars ['modulus'],  16)
+        self.exponent = rsatype (vars ['exponent'], 16)
         for form in self.soup.find_all ('form') :
             if 'id' in form.attrs and form ['id'] == 'loginForm' :
-                self.nextfile = form ['action'].lstrip ('/')
+                self.next_file (form ['action'])
                 assert form ['method'] == 'post'
                 break
         self.debug (self.nextfile)
-        # FIXME: We may want to get the RSA parameters from the
-        #        javascript in the received html
-        enc = PW_Encode ()
+
+        enc = PW_Encode (modulus = self.modulus, exponent = self.exponent)
         d = dict \
             ( password      = enc.encrypt (self.args.password)
             , userName      = self.args.username
@@ -130,7 +158,7 @@ class HTML_Requester (object) :
         self.debug (self.info)
         if 'MultiChallenge' not in self.purl :
             print ("Login failed")
-            self.debug ("Login failed")
+            self.debug ("Login failed (no MultiChallenge)")
             return
         d = self.parse_pw_response ()
         otp = getpass ('One-time Password: ')
@@ -139,7 +167,7 @@ class HTML_Requester (object) :
         self.open (data = urlencode (d))
         if not self.purl.endswith ('Portal/Main') :
             print ("Login failed")
-            self.debug ("Login failed")
+            self.debug ("Login failed (expected Portal)")
             return
         self.debug (self.purl)
         self.debug (self.info)
@@ -149,14 +177,27 @@ class HTML_Requester (object) :
         self.open  ('sslvpn/SNX/extender')
         self.parse_extender ()
         self.generate_snx_info ()
+        return True
     # end def login
 
-    def open (self, filepart = None, data = None) :
+    def next_file (self, fname) :
+        if fname.startswith ('/') :
+            self.nextfile = fname.lstrip ('/')
+        else :
+            dir = self.nextfile.split ('/')
+            dir = dir [:-1]
+            fn  = fname.split ('/')
+            self.nextfile = '/'.join (dir + fn)
+            # We might try to remove '..' elements in the future
+    # end def next_file
+
+    def open (self, filepart = None, data = None, do_soup = True) :
         filepart = filepart or self.nextfile
         url = '/'.join (('%s:/' % self.args.protocol, self.args.host, filepart))
         rq = Request (url, data)
-        f  = self.opener.open (rq, timeout = 10)
-        self.soup = BeautifulSoup (f)
+        self.f = f = self.opener.open (rq, timeout = 10)
+        if do_soup :
+            self.soup = BeautifulSoup (f)
         self.purl = f.geturl ()
         self.info = f.info ()
     # end def open
@@ -198,7 +239,7 @@ class HTML_Requester (object) :
         """
         for form in self.soup.find_all ('form') :
             if 'name' in form.attrs and form ['name'] == 'MCForm' :
-                self.nextfile = form ['action'].lstrip ('/')
+                self.next_file (form ['action'])
                 assert form ['method'] == 'post'
                 break
         d = {}
@@ -220,27 +261,27 @@ class PW_Encode (object) :
         compatible with checkpoints implementation.
         Test with non-random padding to get known value:
         >>> p = PW_Encode (testing = True)
-        >>> print (p.encrypt ('xyzzy'))
+        >>> print (p.encrypt (b'xyzzy'))
         451c2d5b491ee22d6f7cdc5a20f320914668f8e01337625dfb7e0917b16750cfbafe38bfcb68824b30d5cc558fa1c6d542ff12ac8e1085b7a9040f624ab39f625cabd77d1d024c111e42fede782e089400d2c9b1d6987c0005698178222e8500243f12762bebba841eae331d17b290f80bca6c3f8a49522fb926646c24db3627
-        >>> print (p.encrypt ('XYZZYxyzzyXYZZYxyzzy'))
+        >>> print (p.encrypt (b'XYZZYxyzzyXYZZYxyzzy'))
         a529e86cf80dd131e3bdae1f6dbab76f67f674e42041dde801ebdb790ab0637d56cc82f52587f2d4d34d26c490eee3a1ebfd80df18ec41c4440370b1ecb2dec3f811e09d2248635dd8aab60a97293ec0315a70bf024b33e8a8a02582fbabc98dd72d913530151e78b47119924f45b711b9a1189d5eec5a20e6f9bc1d44bfd554
     """
 
-    def __init__ (self, m = None, e = None, testing = False) :
-        modulus = long \
-            ( 'c87e9e96ffde3ec47c3f116ea5ac0e15'
-              '34490b3da6dbbedae1af50dc32bf1012'
-              'bdb7e1ff67237e0302b48c8731f343ff'
-              '644662de2bb21d2b033127660e525d58'
-              '889f8f6f05744906dddc8f4b85e0916b'
-              '5d9cf5b87093ed260238674f143801b7'
-              'e58a18795adc9acefaf0f378326fea19'
-              '9ac6e5a88be83a52d4a77b3bba5f1aed'
+    def __init__ (self, modulus = None, exponent = None, testing = False) :
+        m = rsatype \
+            ( b'c87e9e96ffde3ec47c3f116ea5ac0e15'
+              b'34490b3da6dbbedae1af50dc32bf1012'
+              b'bdb7e1ff67237e0302b48c8731f343ff'
+              b'644662de2bb21d2b033127660e525d58'
+              b'889f8f6f05744906dddc8f4b85e0916b'
+              b'5d9cf5b87093ed260238674f143801b7'
+              b'e58a18795adc9acefaf0f378326fea19'
+              b'9ac6e5a88be83a52d4a77b3bba5f1aed'
             , 16
             )
-        exponent = long ('010001', 16)
-        m = m or modulus
-        e = e or exponent
+        e = rsatype (b'010001', 16)
+        m = modulus  or m
+        e = exponent or e
         self.pubkey  = RSA.construct ((m, e))
         self.testing = testing
     # end def __init__
@@ -281,7 +322,7 @@ def main () :
     cmd.add_argument \
         ( '-F', '--file'
         , help    = 'File part of URL default=%(default)s'
-        , default = 'sslvpn'
+        , default = 'sslvpn/Login/Login'
         )
     cmd.add_argument \
         ( '-H', '--host'
@@ -340,8 +381,9 @@ def main () :
         if 'password' not in args :
             password = getpass ('Password: ')
     rq = HTML_Requester (args)
-    rq.login ()
-    rq.call_snx ()
+    result = rq.login ()
+    if result :
+        rq.call_snx ()
 # end def main ()
 
 if __name__ == '__main__' :
