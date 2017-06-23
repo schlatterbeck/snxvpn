@@ -65,9 +65,10 @@ class HTML_Requester (object) :
         sock.connect (("127.0.0.1", 7776))
         sock.sendall (self.snx_info)
         answer = sock.recv (4096)
-        f = open ('snxanswer', 'w')
-        f.write (answer)
-        f.close ()
+        if self.args.debug :
+            f = open ('snxanswer', 'w')
+            f.write (answer)
+            f.close ()
         answer = sock.recv (4096) # should block until snx dies
     # end def call_snx
 
@@ -142,7 +143,9 @@ class HTML_Requester (object) :
             return
         self.debug (self.purl)
         self.debug (self.info)
-        self.jar.save ('cookies', ignore_discard = True, ignore_expires = True)
+        if self.args.save_cookies :
+            self.jar.save \
+                ('cookies.txt', ignore_discard = True, ignore_expires = True)
         self.open  ('sslvpn/SNX/extender')
         self.parse_extender ()
         self.generate_snx_info ()
@@ -274,7 +277,6 @@ def main () :
         ( '-D', '--debug'
         , help    = 'Debug handshake'
         , action  = 'store_true'
-        , default = True
         )
     cmd.add_argument \
         ( '-F', '--file'
@@ -309,6 +311,12 @@ def main () :
         ( '-R', '--realm'
         , help    = 'Selected realm, default=%(default)s'
         , default = 'ssl_vpn'
+        )
+    cmd.add_argument \
+        ( '-s', '--save-cookies'
+        , help    = 'Save cookies to cookies.txt, might be a security risk'
+        , action  = 'store_true'
+        , default = True
         )
     cmd.add_argument \
         ( '-U', '--username'
