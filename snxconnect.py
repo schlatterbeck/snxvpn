@@ -1,16 +1,26 @@
 #!/usr/bin/python
 
+from __future__        import print_function, unicode_literals
 import os
 import sys
-import urllib2
-from rsclib.HTML_Parse import Page_Tree
-from cookielib         import LWPCookieJar
+import socket
+try :
+    from urllib2 import build_opener, HTTPCookieProcessor, Request
+    from urllib  import urlencode
+except ImportError :
+    from urllib.request import build_opener, HTTPCookieProcessor, Request
+    from urllib.parse   import urlencode
+try :
+    from cookielib import LWPCookieJar
+except ImportError :
+    from http.cookiejar import LWPCookieJar
 from bs4               import BeautifulSoup
 from getpass           import getpass
-from urllib            import urlencode
 from argparse          import ArgumentParser
 from netrc             import netrc
 from Crypto.PublicKey  import RSA
+from struct            import pack
+from subprocess        import Popen, PIPE
 
 """ Todo:
     - timeout can be retrieved at /sslvpn/Portal/LoggedIn
@@ -29,29 +39,75 @@ class HTML_Requester (object) :
     def __init__ (self, args) :
         self.args     = args
         self.jar      = j = LWPCookieJar ()
-        self.opener   = urllib2.build_opener (urllib2.HTTPCookieProcessor (j))
+        self.opener   = build_opener (HTTPCookieProcessor (j))
         self.nextfile = args.file
     # end def __init__
 
-    def open (self, filepart = None, data = None) :
-        filepart = filepart or self.nextfile
-        url = '/'.join (('%s:/' % self.args.protocol, self.args.host, filepart))
-        rq = urllib2.Request (url, data)
-        f  = self.opener.open (rq, timeout = 10)
-        self.soup = BeautifulSoup (f)
-        self.purl = f.geturl ()
-        self.info = f.info ()
-    # end def open
+    def call_snx (self, snx_path = '/usr/bin/snx') :
+        """ The snx binary usually lives in the default snx_path and is
+            setuid root. We call it with the undocumented '-Z' option.
+            When everything is well it forks a subprocess and exists
+            (daemonize). If an error occurs before forking we get the
+            result back on one of the file descriptors. If everything
+            goes well, the forked snx process opens a port on
+            localhost:7776 (I've found no way this can be configured)
+            and waits for us to pass the binary-encoded parameters via
+            this socket. It later sends back an answer. It seems to keep
+            the socket open, so we do another read to wait for snx to
+            terminate.
+        """
+        snx = Popen (['snx', '-Z'], stdin = PIPE, stdout = PIPE, stderr = PIPE)
+        stdout, stderr = snx.communicate ('')
+        rc = snx.returncode
+        if rc != 0 :
+            print ("SNX terminated with error: %d %s%s" % (rc, stdout, stderr))
+        sock = socket.socket (socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect (("127.0.0.1", 7776))
+        sock.sendall (self.snx_info)
+        answer = sock.recv (4096)
+        f = open ('snxanswer', 'w')
+        f.write (answer)
+        f.close ()
+        answer = sock.recv (4096) # should block until snx dies
+    # end def call_snx
 
     def debug (self, s) :
         if self.args.debug :
-            print s
+            print (s)
     # end def debug
+
+    def generate_snx_info (self) :
+        """ Communication with SNX (originally by the java framework) is
+            done via an undocumented binary format. We try to reproduce
+            this here. We asume native byte-order but we don't know if
+            snx binaries exist for other architectures with a different
+            byte-order.
+        """
+        magic  = b'\x13\x11\x00\x00'
+        length = 0x3d0
+        magic2 = b'\xc2\x49\x25\xc2' # ???
+        fmt    = '=4sL4s64sL6s256s256s128s256sH'
+        info   = pack \
+            ( fmt
+            , magic
+            , length
+            , magic2
+            , self.extender_vars ['host_name']
+            , int (self.extender_vars ['port'])
+            , b''
+            , self.extender_vars ['server_cn']
+            , self.extender_vars ['user_name']
+            , self.extender_vars ['password']
+            , self.extender_vars ['server_fingerprint']
+            , 1 # ???
+            )
+        assert len (info) == length + 8 # magic + length
+        self.snx_info = info
+    # end def generate_snx_info
 
     def login (self) :
         self.open ()
-        forms = self.soup.find_all ('form')
-        for form in forms :
+        for form in self.soup.find_all ('form') :
             if 'id' in form.attrs and form ['id'] == 'loginForm' :
                 self.nextfile = form ['action'].lstrip ('/')
                 assert form ['method'] == 'post'
@@ -72,7 +128,7 @@ class HTML_Requester (object) :
         self.debug (self.purl)
         self.debug (self.info)
         if 'MultiChallenge' not in self.purl :
-            print "Login failed"
+            print ("Login failed")
             self.debug ("Login failed")
             return
         d = self.parse_pw_response ()
@@ -81,19 +137,63 @@ class HTML_Requester (object) :
         self.debug (self.nextfile)
         self.open (data = urlencode (d))
         if not self.purl.endswith ('Portal/Main') :
-            print "Login failed"
+            print ("Login failed")
             self.debug ("Login failed")
             return
         self.debug (self.purl)
         self.debug (self.info)
         self.jar.save ('cookies', ignore_discard = True, ignore_expires = True)
         self.open  ('sslvpn/SNX/extender')
-        print self.soup.prettify ()
+        self.parse_extender ()
+        self.generate_snx_info ()
     # end def login
 
+    def open (self, filepart = None, data = None) :
+        filepart = filepart or self.nextfile
+        url = '/'.join (('%s:/' % self.args.protocol, self.args.host, filepart))
+        rq = Request (url, data)
+        f  = self.opener.open (rq, timeout = 10)
+        self.soup = BeautifulSoup (f)
+        self.purl = f.geturl ()
+        self.info = f.info ()
+    # end def open
+
+    def parse_extender (self) :
+        """ The SNX extender page contains the necessary credentials for
+            connecting the VPN. This information then passed to the snx
+            program via a socket.
+        """
+        for script in self.soup.find_all ('script') :
+            if '/* Extender.user_name' in script.text :
+                break
+        else :
+            print ("Error retrieving extender variables")
+            return
+        for line in script.text.split ('\n') :
+            if '/* Extender.user_name' in line :
+                break
+        stmts = line.split (';')
+        vars  = {}
+        for stmt in stmts :
+            try :
+                lhs, rhs = stmt.split ('=')
+            except ValueError :
+                break
+            try :
+                lhs = lhs.split ('.', 1)[1].strip ()
+            except IndexError :
+                continue
+            rhs = rhs.strip ().strip ('"')
+            vars [lhs] = rhs.encode ('utf-8')
+        self.extender_vars = vars
+    # end def parse_extender
+
     def parse_pw_response (self) :
-        forms = self.soup.find_all ('form')
-        for form in forms :
+        """ The password response contains another form where the
+            one-time password (in our case received via a message to the
+            phone) must be entered.
+        """
+        for form in self.soup.find_all ('form') :
             if 'name' in form.attrs and form ['name'] == 'MCForm' :
                 self.nextfile = form ['action'].lstrip ('/')
                 assert form ['method'] == 'post'
@@ -117,9 +217,9 @@ class PW_Encode (object) :
         compatible with checkpoints implementation.
         Test with non-random padding to get known value:
         >>> p = PW_Encode (testing = True)
-        >>> print p.encrypt ('xyzzy')
+        >>> print (p.encrypt ('xyzzy'))
         451c2d5b491ee22d6f7cdc5a20f320914668f8e01337625dfb7e0917b16750cfbafe38bfcb68824b30d5cc558fa1c6d542ff12ac8e1085b7a9040f624ab39f625cabd77d1d024c111e42fede782e089400d2c9b1d6987c0005698178222e8500243f12762bebba841eae331d17b290f80bca6c3f8a49522fb926646c24db3627
-        >>> print p.encrypt ('XYZZYxyzzyXYZZYxyzzy')
+        >>> print (p.encrypt ('XYZZYxyzzyXYZZYxyzzy'))
         a529e86cf80dd131e3bdae1f6dbab76f67f674e42041dde801ebdb790ab0637d56cc82f52587f2d4d34d26c490eee3a1ebfd80df18ec41c4440370b1ecb2dec3f811e09d2248635dd8aab60a97293ec0315a70bf024b33e8a8a02582fbabc98dd72d913530151e78b47119924f45b711b9a1189d5eec5a20e6f9bc1d44bfd554
     """
 
@@ -145,18 +245,18 @@ class PW_Encode (object) :
     def pad (self, txt) :
         l = (self.pubkey.size () + 7) >> 3
         r = []
-        r.append ('\0')
+        r.append (b'\0')
         for x in reversed (txt) :
             r.append (x)
-        r.append ('\0')
+        r.append (b'\0')
         n = l - len (r) - 2
         if self.testing :
-            r.append ('\1' * n)
+            r.append (b'\1' * n)
         else :
             r.append (os.urandom (n))
-        r.append ('\x02')
-        r.append ('\x00')
-        return ''.join (reversed (r))
+        r.append (b'\x02')
+        r.append (b'\x00')
+        return b''.join (reversed (r))
     # end def pad
 
     def encrypt (self, password) :
@@ -233,6 +333,7 @@ def main () :
             password = getpass ('Password: ')
     rq = HTML_Requester (args)
     rq.login ()
+    rq.call_snx ()
 # end def main ()
 
 if __name__ == '__main__' :
