@@ -35,9 +35,40 @@ from subprocess        import Popen, PIPE
     - Log debug logs to syslog
 """
 
+if sys.version_info >= (3,) :
+    def b_ord (x) :
+        return x
+else :
+    def b_ord (x) :
+        return ord (x)
+
+def iterbytes (x) :
+    """ Compatibility with python3: Iterating over bytes returns int.
+        Adding insult to injury calling bytes (23) will return a bytes
+        object with length 23 filled with b'\0'. So we do this.
+        Note that we will have to flatten iterators like the one
+        resulting from a call to reversed.
+    >>> a = []
+    >>> for k in iterbytes (b'abcdef') :
+    ...     a.append (k)
+    >>> for k in iterbytes (reversed (b'abcdef')) :
+    ...     a.append (k)
+    >>> print (repr (b''.join (a)).lstrip ('b'))
+    'abcdeffedcba'
+    """
+    if sys.version_info >= (3,) :
+        x = bytes (x)
+    else :
+        x = b''.join (x)
+    for i in range (len (x)) :
+        yield (x [i:i+1])
+# end def iterbytes
+
 class HTML_Requester (object) :
 
     def __init__ (self, args) :
+        self.modulus  = None
+        self.exponent = None
         self.args     = args
         self.jar      = j = LWPCookieJar ()
         self.opener   = build_opener (HTTPCookieProcessor (j))
@@ -67,7 +98,7 @@ class HTML_Requester (object) :
         sock.sendall (self.snx_info)
         answer = sock.recv (4096)
         if self.args.debug :
-            f = open ('snxanswer', 'w')
+            f = open ('snxanswer', 'wb')
             f.write (answer)
             f.close ()
         answer = sock.recv (4096) # should block until snx dies
@@ -119,24 +150,10 @@ class HTML_Requester (object) :
             print ('No RSA javascript file found, cannot login')
             return
         self.open (do_soup = False)
-        keys = ('modulus', 'exponent')
-        vars = {}
-        for line in self.f :
-            for k in keys :
-                if 'var %s' % k in line :
-                    val = line.strip ().rstrip (';')
-                    val = val.split ('=', 1) [-1]
-                    val = val.strip ().strip ("'")
-                    vars [k] = val
-                    break
-            if len (vars) == 2 :
-                break
-        else :
-            print ('No RSA parameters found, cannot login')
+        self.parse_rsa_params ()
+        if not self.modulus :
+            # Error message already given in parse_rsa_params
             return
-        self.debug (repr (vars))
-        self.modulus  = rsatype (vars ['modulus'],  16)
-        self.exponent = rsatype (vars ['exponent'], 16)
         for form in self.soup.find_all ('form') :
             if 'id' in form.attrs and form ['id'] == 'loginForm' :
                 self.next_file (form ['action'])
@@ -194,6 +211,8 @@ class HTML_Requester (object) :
     def open (self, filepart = None, data = None, do_soup = True) :
         filepart = filepart or self.nextfile
         url = '/'.join (('%s:/' % self.args.protocol, self.args.host, filepart))
+        if data :
+            data = data.encode ('ascii')
         rq = Request (url, data)
         self.f = f = self.opener.open (rq, timeout = 10)
         if do_soup :
@@ -254,6 +273,28 @@ class HTML_Requester (object) :
         return d
     # end def parse_pw_response
 
+    def parse_rsa_params (self) :
+        keys = ('modulus', 'exponent')
+        vars = {}
+        for line in self.f :
+            line = line.decode ('utf-8')
+            for k in keys :
+                if 'var %s' % k in line :
+                    val = line.strip ().rstrip (';')
+                    val = val.split ('=', 1) [-1]
+                    val = val.strip ().strip ("'")
+                    vars [k] = val
+                    break
+            if len (vars) == 2 :
+                break
+        else :
+            print ('No RSA parameters found, cannot login')
+            return
+        self.debug (repr (vars))
+        self.modulus  = rsatype (vars ['modulus'],  16)
+        self.exponent = rsatype (vars ['exponent'], 16)
+    # end def parse_rsa_params
+
 # end class HTML_Requester
 
 class PW_Encode (object) :
@@ -261,9 +302,9 @@ class PW_Encode (object) :
         compatible with checkpoints implementation.
         Test with non-random padding to get known value:
         >>> p = PW_Encode (testing = True)
-        >>> print (p.encrypt (b'xyzzy'))
+        >>> print (p.encrypt ('xyzzy'))
         451c2d5b491ee22d6f7cdc5a20f320914668f8e01337625dfb7e0917b16750cfbafe38bfcb68824b30d5cc558fa1c6d542ff12ac8e1085b7a9040f624ab39f625cabd77d1d024c111e42fede782e089400d2c9b1d6987c0005698178222e8500243f12762bebba841eae331d17b290f80bca6c3f8a49522fb926646c24db3627
-        >>> print (p.encrypt (b'XYZZYxyzzyXYZZYxyzzy'))
+        >>> print (p.encrypt ('XYZZYxyzzyXYZZYxyzzy'))
         a529e86cf80dd131e3bdae1f6dbab76f67f674e42041dde801ebdb790ab0637d56cc82f52587f2d4d34d26c490eee3a1ebfd80df18ec41c4440370b1ecb2dec3f811e09d2248635dd8aab60a97293ec0315a70bf024b33e8a8a02582fbabc98dd72d913530151e78b47119924f45b711b9a1189d5eec5a20e6f9bc1d44bfd554
     """
 
@@ -290,7 +331,9 @@ class PW_Encode (object) :
         l = (self.pubkey.size () + 7) >> 3
         r = []
         r.append (b'\0')
-        for x in reversed (txt) :
+        # Note that first reversing and then encoding to utf-8 would
+        # *not* be correct!
+        for x in iterbytes (reversed (txt.encode ('utf-8'))) :
             r.append (x)
         r.append (b'\0')
         n = l - len (r) - 2
@@ -306,7 +349,7 @@ class PW_Encode (object) :
     def encrypt (self, password) :
         x = self.pad (password)
         e = self.pubkey.encrypt (x, '')[0]
-        e = ''.join ('%02x' % ord (c) for c in reversed (e))
+        e = ''.join ('%02x' % b_ord (c) for c in reversed (e))
         return e
     # end def encrypt
 
