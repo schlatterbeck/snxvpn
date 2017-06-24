@@ -24,6 +24,7 @@ from netrc             import netrc
 from Crypto.PublicKey  import RSA
 from struct            import pack
 from subprocess        import Popen, PIPE
+from snxvpnversion     import VERSION
 
 """ Todo:
     - timeout can be retrieved at /sslvpn/Portal/LoggedIn
@@ -434,7 +435,15 @@ def main () :
         , help    = 'VPID prefix, default "%(default)s"'
         , default = cfg.get ('vpid_prefix', '')
         )
+    cmd.add_argument \
+        ( '--version'
+        , help    = 'Display version and exit'
+        , action  = 'store_true'
+        )
     args = cmd.parse_args ()
+    if args.version :
+        print ("snxconnect version %s by Ralf Schlatterbeck" % VERSION)
+        sys.exit (0)
     if not args.username or not args.password :
         n = netrc ()
         a = n.authenticators (args.host)
