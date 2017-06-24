@@ -38,16 +38,27 @@ make it work.
 Install and Run
 ---------------
 
-The project doesn't have an installation script ``setup.py`` yet.
-Just install the necessary dependencies which are:
+The program should be installable with normal::
+
+ python setup.py install --prefix=/usr/local
+
+when you have already downloaded and unpacked the sources. Alternatively
+install via ``pip`` should also work (replace ``pip`` with ``pip3`` if
+you want to install for python3)::
+
+ pip install snxvpn
+
+The following dependencies are needed but should be picked up
+automagically if you install via ``pip``:
 
 - Beautiful Soup version 4 (``python-bs4`` Debian package)
 - pycrypto (``python-crypto`` Debian package)
 
-After these are installed, you should be able to directly run
-``snxconnect.py`` from anywhere.
+After installation you should be able to run ``snxconnect --help`` to
+find out about options. At least a host, and username must be given,
+either on the command-line via options or in a config file (see below).
 
-The ``snxconnect.py`` program will currently create two files in the
+The ``snxconnect`` program will currently create two files in the
 current working directory where the program is started:
 
 - ``snxanswer``: The not-yet-reverse-engineered answer of Checkpoint's
@@ -64,22 +75,22 @@ lifetime and your connection isn't very secure if you cannot be sure of
 the files on your disk. Moreover all users of the current machine can
 access the VPN connection anyway.
 
-When you run ``snx`` for the first time with my program it creates an
-X-Windows popup that lets you confirm the server fingerprint. I've not
-seen this popup with the Java framework (but Java died several times
-during my first experiments which is one of the reasons I wrote this
-program, so that might be the reason I hadn't seen the popup before).
-You have to confirm this popup. The server fingerprint is stored into a
-file with extension ``.db`` in ``/etc/snx``.
+When you run Checkpoints ``snx`` for the first time with my program it
+creates an X-Windows popup that lets you confirm the server fingerprint.
+I've not seen this popup with the Java framework (but Java died several
+times during my first experiments which is one of the reasons I wrote
+this program, so that might be the reason I hadn't seen the popup
+before).  You have to confirm this popup. The server fingerprint is
+stored into a file with extension ``.db`` in ``/etc/snx``.
 
-For configuration, snx accepts a config file ``$HOME/.snxvpnrc``. The
-options there are the command-line long options (obtained with --help)
-where a '-' is replaced with '_'.  For compatibility with ``.snxrc``,
-the keyword ``server`` is an alias for ``host``. You can see which
-options were picked up from the config-file by specifying ``--help``,
-where defaults are displayed, the defaults from the config-file are
-displayed. Command-line options take precedence over config-file
-entries.
+For configuration, ``snxconnect`` accepts a config file
+``$HOME/.snxvpnrc``. The options there are the command-line long options
+(obtained with --help) where a '-' is replaced with '_'.  For
+compatibility with ``.snxrc``, the keyword ``server`` is an alias for
+``host``. You can see which options were picked up from the config-file
+by specifying ``--help``, where defaults are displayed, the defaults
+from the config-file are displayed. Command-line options take precedence
+over config-file entries.
 
 In addition a ``.netrc`` file is supported that can contain username and
 password by host name. Note that storing long-term login credentials on
