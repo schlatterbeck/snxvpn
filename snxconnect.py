@@ -2,6 +2,7 @@
 
 from __future__        import print_function, unicode_literals
 import os
+import os.path
 import sys
 import socket
 try :
@@ -356,60 +357,82 @@ class PW_Encode (object) :
 # end class PW_Encode
 
 def main () :
+    # First try to parse config-file ~/.snxvpnrc:
+    home = os.environ.get ('HOME')
+    cfgf = None
+    if home :
+        try :
+            cfgf = open (os.path.join (home, '.snxvpnrc'), 'rb')
+        except OSError :
+            pass
+    cfg = {}
+    if cfgf :
+        for line in cfgf :
+            line = line.strip ().decode ('utf-8')
+            if line.startswith ('#') :
+                continue
+            k, v = line.split (None, 1)
+            if k == 'server' :
+                k = 'host'
+            cfg [k] = v
+
     cmd = ArgumentParser ()
     cmd.add_argument \
         ( '-D', '--debug'
         , help    = 'Debug handshake'
         , action  = 'store_true'
+        , default = cfg.get ('debug', None)
         )
     cmd.add_argument \
         ( '-F', '--file'
-        , help    = 'File part of URL default=%(default)s'
-        , default = 'sslvpn/Login/Login'
+        , help    = 'File part of URL default="%(default)s"'
+        , default = cfg.get ('file', 'sslvpn/Login/Login')
         )
     cmd.add_argument \
         ( '-H', '--host'
-        , help    = 'Host part of URL default=%(default)s'
-        , default = 'snx.lfrz.at'
+        , help    = 'Host part of URL default="%(default)s"'
+        , default = cfg.get ('host', '')
         )
     cmd.add_argument \
         ( '--height-data'
-        , help    = 'Height data in form, default empty'
-        , default = ''
+        , help    = 'Height data in form, default "%(default)s"'
+        , default = cfg.get ('height_data', '')
         )
     cmd.add_argument \
         ( '-L', '--login-type'
-        , help    = 'Login type, default=%(default)s'
-        , default = 'Standard'
+        , help    = 'Login type, default="%(default)s"'
+        , default = cfg.get ('login_type', 'Standard')
         )
     cmd.add_argument \
         ( '-P', '--password'
         , help    = 'Login password, not a good idea to specify on commandline'
+        , default = cfg.get ('password', None)
         )
     cmd.add_argument \
         ( '-p', '--protocol'
         , help    = 'http or https, should *always* be https except for tests'
-        , default = 'https'
+        , default = cfg.get ('protocol', 'https')
         )
     cmd.add_argument \
         ( '-R', '--realm'
-        , help    = 'Selected realm, default=%(default)s'
-        , default = 'ssl_vpn'
+        , help    = 'Selected realm, default="%(default)s"'
+        , default = cfg.get ('realm', 'ssl_vpn')
         )
     cmd.add_argument \
         ( '-s', '--save-cookies'
         , help    = 'Save cookies to cookies.txt, might be a security risk'
         , action  = 'store_true'
-        , default = True
+        , default = cfg.get ('save_cookies', False)
         )
     cmd.add_argument \
         ( '-U', '--username'
-        , help    = 'Login username'
+        , help    = 'Login username, default="%(default)s"'
+        , default = cfg.get ('username', '')
         )
     cmd.add_argument \
         ( '-V', '--vpid-prefix'
-        , help    = 'VPID prefix, default empty'
-        , default = ''
+        , help    = 'VPID prefix, default "%(default)s"'
+        , default = cfg.get ('vpid_prefix', '')
         )
     args = cmd.parse_args ()
     if not args.username or not args.password :

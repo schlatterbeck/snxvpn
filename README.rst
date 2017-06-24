@@ -72,6 +72,20 @@ program, so that might be the reason I hadn't seen the popup before).
 You have to confirm this popup. The server fingerprint is stored into a
 file with extension ``.db`` in ``/etc/snx``.
 
+For configuration, snx accepts a config file ``$HOME/.snxvpnrc``. The
+options there are the command-line long options (obtained with --help)
+where a '-' is replaced with '_'.  For compatibility with ``.snxrc``,
+the keyword ``server`` is an alias for ``host``. You can see which
+options were picked up from the config-file by specifying ``--help``,
+where defaults are displayed, the defaults from the config-file are
+displayed. Command-line options take precedence over config-file
+entries.
+
+In addition a ``.netrc`` file is supported that can contain username and
+password by host name. Note that storing long-term login credentials on
+disk is a security risk. See the manual page for ``netrc`` for further
+details.
+
 Notes on ``snx`` Installation
 -----------------------------
 
