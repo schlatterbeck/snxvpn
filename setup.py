@@ -20,6 +20,7 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 # ****************************************************************************
 
+from snxvpnversion import VERSION
 
 from distutils.core import setup, Extension
 license = 'BSD License'
@@ -33,7 +34,7 @@ f.close ()
 setup \
     ( name             = "snxvpn"
     , py_modules       = ['snxconnect', 'snxvpnversion']
-    , version          = "1.0"
+    , version          = VERSION
     , description      =
         "Command-line utility to connect to a Checkpoint SSL VPN "
     , long_description = ''.join (description)

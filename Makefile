@@ -27,7 +27,8 @@ dist: all
 clean:
 	rm -f MANIFEST $(VERSION) notes changes                       \
 	      README.html README.aux README.dvi README.log README.out \
-	      README.tex announce_pypi
+	      README.tex announce_pypi upload_pypi
 	rm -rf dist build upload upload_homepage ReleaseNotes.txt
+	rm -rf __pycache__
 
 include $(RELEASETOOLS)/Makefile-sf
