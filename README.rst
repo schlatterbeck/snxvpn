@@ -38,7 +38,7 @@ make it work.
 Install and Run
 ---------------
 
-The program should be installable with normal::
+The ``snxvpn`` package should be installable with normal::
 
  python setup.py install --prefix=/usr/local
 
@@ -75,11 +75,11 @@ lifetime and your connection isn't very secure if you cannot be sure of
 the files on your disk. Moreover all users of the current machine can
 access the VPN connection anyway.
 
-When you run Checkpoints ``snx`` for the first time with my program it
+When you run Checkpoints ``snx`` for the first time with ``snxconnect`` it
 creates an X-Windows popup that lets you confirm the server fingerprint.
 I've not seen this popup with the Java framework (but Java died several
 times during my first experiments which is one of the reasons I wrote
-this program, so that might be the reason I hadn't seen the popup
+``snxvpn``, so that might be the reason I hadn't seen the popup
 before).  You have to confirm this popup. The server fingerprint is
 stored into a file with extension ``.db`` in ``/etc/snx``.
 
@@ -135,7 +135,7 @@ Some Notes on the Mechanisms
 ----------------------------
 
 This section discusses some of the internals of how the ``snx`` program
-is called by the Java framework and this program.
+is called by the Java framework and ``snxconnect``.
 
 The Login process via the browser is a standard login page with lots of
 Javascript and redirects. Passwords are sent in encrypted form to the
@@ -174,7 +174,7 @@ close the file-descriptors for standard input, output, and error.
 
 After this, ``snx`` opens and listens on a TCP socket on port 7776 on
 the local machine. I haven't found options for telling ``snx`` to use
-another port. The calling application (e.g., this program or the
+another port. The calling application (e.g., ``snxconnect`` or the
 original Java framework) is expected to pass the connection information
 detailed above in an undocumented binary format. After that ``snx``
 establishes a VPN connection and reports back with another blob of
