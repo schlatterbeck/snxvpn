@@ -367,7 +367,7 @@ def main () :
     if home :
         try :
             cfgf = open (os.path.join (home, '.snxvpnrc'), 'rb')
-        except OSError :
+        except (OSError, IOError) :
             pass
     cfg = {}
     if cfgf :
@@ -380,6 +380,7 @@ def main () :
                 k = 'host'
             cfg [k] = v
 
+    host       = cfg.get ('host', '')
     cmd = ArgumentParser ()
     cmd.add_argument \
         ( '-D', '--debug'
@@ -394,8 +395,9 @@ def main () :
         )
     cmd.add_argument \
         ( '-H', '--host'
-        , help    = 'Host part of URL default="%(default)s"'
-        , default = cfg.get ('host', '')
+        , help     = 'Host part of URL default="%(default)s"'
+        , default  = host
+        , required = not host
         )
     cmd.add_argument \
         ( '--height-data'
@@ -454,8 +456,13 @@ def main () :
         print ("snxconnect version %s by Ralf Schlatterbeck" % VERSION)
         sys.exit (0)
     if not args.username or not args.password :
-        n = netrc ()
-        a = n.authenticators (args.host)
+        n = a = None
+        try :
+            n = netrc ()
+        except IOError :
+            pass
+        if n :
+            a = n.authenticators (args.host)
         if a :
             un, dummy, pw = a
             if not args.username :
