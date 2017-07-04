@@ -77,8 +77,8 @@ class HTML_Requester (object) :
         self.nextfile = args.file
     # end def __init__
 
-    def call_snx (self, snx_path = '/usr/bin/snx') :
-        """ The snx binary usually lives in the default snx_path and is
+    def call_snx (self) :
+        """ The snx binary usually lives in the default snxpath and is
             setuid root. We call it with the undocumented '-Z' option.
             When everything is well it forks a subprocess and exists
             (daemonize). If an error occurs before forking we get the
@@ -90,7 +90,8 @@ class HTML_Requester (object) :
             the socket open, so we do another read to wait for snx to
             terminate.
         """
-        snx = Popen (['snx', '-Z'], stdin = PIPE, stdout = PIPE, stderr = PIPE)
+        sp  = self.args.snxpath
+        snx = Popen ([sp, '-Z'], stdin = PIPE, stdout = PIPE, stderr = PIPE)
         stdout, stderr = snx.communicate ('')
         rc = snx.returncode
         if rc != 0 :
@@ -424,6 +425,12 @@ def main () :
         , help    = 'Save cookies to cookies.txt, might be a security risk'
         , action  = 'store_true'
         , default = cfg.get ('save_cookies', False)
+        )
+    cmd.add_argument \
+        ( '-S', '--snxpath'
+        , help    = 'snx binary to call, default="%(default)s", you might'
+                    ' want a full path here'
+        , default = cfg.get ('snxpath', 'snx')
         )
     cmd.add_argument \
         ( '-U', '--username'
