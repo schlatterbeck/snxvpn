@@ -38,13 +38,8 @@ make it work.
 Install and Run
 ---------------
 
-The ``snxvpn`` package should be installable with normal::
-
- python setup.py install --prefix=/usr/local
-
-when you have already downloaded and unpacked the sources. Alternatively
-install via ``pip`` should also work (replace ``pip`` with ``pip3`` if
-you want to install for python3)::
+Install via ``pip`` is the preferred way (replace ``pip`` with ``pip3``
+if you want to install for python3)::
 
  pip install snxvpn
 
@@ -96,6 +91,28 @@ In addition a ``.netrc`` file is supported that can contain username and
 password by host name. Note that storing long-term login credentials on
 disk is a security risk. See the manual page for ``netrc`` for further
 details.
+
+To install from source (from a ``git`` checkout) you need my
+sfreleasetools_ from Sourceforge. This adds the necessary ``Makefile``
+includes to create the ``snxvpnversion.py`` from the git tag containing
+the latest version number. You can either install sfreleasetools_ in a
+sibling directory of ``snxvpn`` called ``releasetools`` or set the
+environment variable RELEASETOOLS pointing to your cloned version.
+You also need the ``rst2html`` command provided by ``docutils``, on
+Debian Linux you can obtain it by installing the ``python-docutils``
+package.
+
+Once this is installed, call ``make`` without arguments. This will
+create the ``snxvpnversion.py`` which is used by the ``setup.py``
+script.
+
+.. _sfreleasetools: https://sourceforge.net/projects/sfreleasetools/
+
+Once the snxvpnversion.py has been created, the ``snxvpn`` package can
+be installed with normal::
+
+ python setup.py install --prefix=/usr/local
+
 
 Notes on ``snx`` Installation
 -----------------------------
