@@ -107,6 +107,14 @@ a binary for the ``i386`` architecture, not a modern 64-bit AMD/Intel
 architecture. I can only give hints for Debian installation here but the
 general steps will apply to other distributions, too.
 
+Obtaining the snx binary in the first place can usually be achieved by
+connecting via web-browser to the SSL-VPN site via the browser, log in
+and (in my installation here at least) look in the *Settings* (in german
+*Einstellungen*) menu for an entry native application settings or
+similar (german "Native Anwendungseinstellungen bearbeiten"). In this
+menu I do have links for manual download of ``snx`` for Linux and
+Mac-OS.
+
 First of all if you're on a 64-bit architecture (called ``amd-64`` at
 least by Debian) you need to enable multi-architecture support with::
 
@@ -126,7 +134,7 @@ Then you need to install some packages that contain libraries needed by
 To check if you have all necessary libraries, you can run ``ldd`` on the
 ``snx`` binary (with sudo to root)::
 
- sudo ldd /usr/local/bin/snx
+ sudo ldd /usr/bin/snx
 
 This should list a library file for each line and should not report any
 missing libraries.
