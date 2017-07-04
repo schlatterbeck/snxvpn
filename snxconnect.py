@@ -104,6 +104,7 @@ class HTML_Requester (object) :
             f = open ('snxanswer', 'wb')
             f.write (answer)
             f.close ()
+        print ("SNX connected, to leave VPN open, leave this running!")
         answer = sock.recv (4096) # should block until snx dies
     # end def call_snx
 
@@ -177,24 +178,25 @@ class HTML_Requester (object) :
         self.debug (self.purl)
         self.debug (self.info)
         if 'MultiChallenge' not in self.purl :
-            print ("Login failed")
-            self.debug ("Login failed (no MultiChallenge)")
+            print ("Login failed (expected MultiChallenge)")
+            self.debug ("Login failed (no MultiChallenge): %s" % self.purl)
             return
         d = self.parse_pw_response ()
         otp = getpass ('One-time Password: ')
         d ['password'] = enc.encrypt (otp)
         self.debug (self.nextfile)
         self.open (data = urlencode (d))
-        if not self.purl.endswith ('Portal/Main') :
-            print ("Login failed")
-            self.debug ("Login failed (expected Portal)")
-            return
-        self.debug (self.purl)
         self.debug (self.info)
+        if not self.purl.endswith ('Portal/Main') :
+            print ("Login failed (expected Portal)")
+            self.debug ("Login failed (expected Portal): %s" % self.purl)
+            return
         if self.args.save_cookies :
             self.jar.save \
                 ('cookies.txt', ignore_discard = True, ignore_expires = True)
         self.open  ('sslvpn/SNX/extender')
+        self.debug (self.purl)
+        self.debug (self.info)
         self.parse_extender ()
         self.generate_snx_info ()
         return True
