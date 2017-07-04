@@ -218,7 +218,7 @@ class HTML_Requester (object) :
         rq = Request (url, data)
         self.f = f = self.opener.open (rq, timeout = 10)
         if do_soup :
-            self.soup = BeautifulSoup (f)
+            self.soup = BeautifulSoup (f, "lxml")
         self.purl = f.geturl ()
         self.info = f.info ()
     # end def open
