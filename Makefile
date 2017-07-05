@@ -12,8 +12,8 @@ SRC=Makefile setup.py snxconnect.py snxconnect \
     MANIFEST.in $(README) README.html
 
 USERNAME=schlatterbeck
-PROJECT=rsclib
-PACKAGE=rsclib
+PROJECT=snxvpn
+PACKAGE=snxvpn
 CHANGES=changes
 NOTES=notes
 
