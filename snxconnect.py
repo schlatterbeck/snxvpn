@@ -130,7 +130,7 @@ class HTML_Requester (object) :
         magic  = b'\x13\x11\x00\x00'
         length = 0x3d0
         magic2 = b'\xc2\x49\x25\xc2' # ???
-        fmt    = '=4sL4s64sL6s256s256s128s256sH'
+        fmt    = b'=4sL4s64sL6s256s256s128s256sH'
         info   = pack \
             ( fmt
             , magic
