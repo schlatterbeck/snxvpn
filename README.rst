@@ -59,16 +59,20 @@ current working directory where the program is started:
 - ``snxanswer``: The not-yet-reverse-engineered answer of Checkpoint's
   ``snx`` program to the caller, only created if the ``--debug`` option
   is given
-- ``cookies.txt``: The cookies from the remote end in the format known
+- ``$HOME/.snxcookies``: The cookies from the remote end in the format known
   from the perl LWP library (available in python as LWPCookieJar), this
-  is only created if the ``--save-cookies`` option is given.
+  is only created if the ``--save-cookies`` option is given. The default
+  cookie filename can be changed with the ``--cookiefile`` option.
 
-The cookies might be used in a future version to reconnect if the
-connection dies prematurely. And, yes, it might be a security risk to
-save this to disk. Note that the cookies of course only have a limited
-lifetime and your connection isn't very secure if you cannot be sure of
-the files on your disk. Moreover all users of the current machine can
-access the VPN connection anyway.
+If a cookie file is found, ``snxconnect`` tries to reconnect without
+asking for a password. This can be used if the connection has died
+prematurely before the connection time ran out. And, yes, it might be a
+security risk to save cookies to disk, so you have to explicitly enable
+this feature by setting ``save-cookies true`` in the config file or
+giving the ``--save-cookies`` option. Note that the cookies of course
+only have a limited lifetime and your connection isn't very secure if
+you cannot be sure of the files on your disk. Moreover all users of the
+current machine can access the VPN connection anyway.
 
 When you run Checkpoints ``snx`` for the first time with ``snxconnect`` it
 creates an X-Windows popup that lets you confirm the server fingerprint.

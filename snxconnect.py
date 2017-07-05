@@ -69,10 +69,17 @@ def iterbytes (x) :
 class HTML_Requester (object) :
 
     def __init__ (self, args) :
-        self.modulus  = None
-        self.exponent = None
-        self.args     = args
-        self.jar      = j = LWPCookieJar ()
+        self.modulus     = None
+        self.exponent    = None
+        self.args        = args
+        self.jar         = j = LWPCookieJar ()
+        self.has_cookies = False
+        if self.args.cookiefile :
+            self.has_cookies = True
+            try :
+                j.load (self.args.cookiefile, ignore_discard = True)
+            except IOError :
+                self.has_cookies = False
         self.opener   = build_opener (HTTPCookieProcessor (j))
         self.nextfile = args.file
     # end def __init__
@@ -143,7 +150,23 @@ class HTML_Requester (object) :
     # end def generate_snx_info
 
     def login (self) :
+        if self.has_cookies :
+            self.debug ("has cookie")
+            self.nextfile = 'Portal/Main'
+            self.open ()
+            self.debug (self.purl)
+            if self.purl.endswith ('Portal/Main') :
+                self.open ('sslvpn/SNX/extender')
+                self.parse_extender ()
+                self.generate_snx_info ()
+                return True
+            else :
+                # Forget Cookies, otherwise we get a 400 bad request later
+                self.jar.clear ()
+                self.next_file (self.purl)
+        self.debug (self.nextfile)
         self.open ()
+        self.debug (self.purl)
         # Get the RSA parameters from the javascript in the received html
         for script in self.soup.find_all ('script') :
             if 'RSA' in script.attrs.get ('src', '') :
@@ -192,8 +215,7 @@ class HTML_Requester (object) :
             self.debug ("Login failed (expected Portal): %s" % self.purl)
             return
         if self.args.save_cookies :
-            self.jar.save \
-                ('cookies.txt', ignore_discard = True, ignore_expires = True)
+            self.jar.save (self.args.cookiefile, ignore_discard = True)
         self.open  ('sslvpn/SNX/extender')
         self.debug (self.purl)
         self.debug (self.info)
@@ -205,6 +227,8 @@ class HTML_Requester (object) :
     def next_file (self, fname) :
         if fname.startswith ('/') :
             self.nextfile = fname.lstrip ('/')
+        elif fname.startswith ('http') :
+            self.nextfile = fname.split ('/', 3)[-1]
         else :
             dir = self.nextfile.split ('/')
             dir = dir [:-1]
@@ -370,6 +394,7 @@ def main () :
         except (OSError, IOError) :
             pass
     cfg = {}
+    boolopts = ['debug', 'save_cookies']
     if cfgf :
         for line in cfgf :
             line = line.strip ().decode ('utf-8')
@@ -378,10 +403,20 @@ def main () :
             k, v = line.split (None, 1)
             if k == 'server' :
                 k = 'host'
+            k = k.replace ('-', '_')
+            if k in boolopts :
+                v = (v.lower () in ('true', 'yes'))
             cfg [k] = v
 
     host       = cfg.get ('host', '')
+    cookiefile = cfg.get ('cookiefile', '%s/.snxcookies' % home)
     cmd = ArgumentParser ()
+    cmd.add_argument \
+        ( '-c', '--cookiefile'
+        , help    = 'Specify cookiefile to save and attempt reconnect'
+                    ' default="%(default)s"'
+        , default = cookiefile
+        )
     cmd.add_argument \
         ( '-D', '--debug'
         , help    = 'Debug handshake'
@@ -426,7 +461,8 @@ def main () :
         )
     cmd.add_argument \
         ( '-s', '--save-cookies'
-        , help    = 'Save cookies to cookies.txt, might be a security risk'
+        , help    = 'Save cookies to %(cookiefile)s, might be a security risk,'
+                    ' default is off' % locals ()
         , action  = 'store_true'
         , default = cfg.get ('save_cookies', False)
         )
