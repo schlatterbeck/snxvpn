@@ -8,10 +8,12 @@ import socket
 try :
     from urllib2 import build_opener, HTTPCookieProcessor, Request
     from urllib  import urlencode
+    from httplib import IncompleteRead
     rsatype = long
 except ImportError :
     from urllib.request import build_opener, HTTPCookieProcessor, Request
     from urllib.parse   import urlencode
+    from http.client    import IncompleteRead
     rsatype = int
 try :
     from cookielib import LWPCookieJar
@@ -22,7 +24,7 @@ from getpass           import getpass
 from argparse          import ArgumentParser
 from netrc             import netrc
 from Crypto.PublicKey  import RSA
-from struct            import pack
+from struct            import pack, unpack
 from subprocess        import Popen, PIPE
 from snxvpnversion     import VERSION
 
@@ -246,7 +248,15 @@ class HTML_Requester (object) :
         rq = Request (url, data)
         self.f = f = self.opener.open (rq, timeout = 10)
         if do_soup :
-            self.soup = BeautifulSoup (f, "lxml")
+            # Sometimes we get incomplete read. So we read everything
+            # the server sent us and hope this is ok. Note: This means
+            # we cannot pass the file to BeautifulSoup but need to read
+            # everything here.
+            try:
+                page = f.read ()
+            except IncompleteRead as e:
+                page = e.partial
+            self.soup = BeautifulSoup (page, "lxml")
         self.purl = f.geturl ()
         self.info = f.info ()
     # end def open

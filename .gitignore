@@ -4,3 +4,8 @@ debuginfo
 build
 README.html
 snxvpnversion.py
+MANIFEST
+announce_pypi
+upload_pypi
+dist
+snxanswer
