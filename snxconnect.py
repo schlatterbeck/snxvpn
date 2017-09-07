@@ -129,13 +129,14 @@ class HTML_Requester (object) :
         """
         magic  = b'\x13\x11\x00\x00'
         length = 0x3d0
-        magic2 = b'\xc2\x49\x25\xc2' # ???
-        fmt    = b'=4sL4s64sL6s256s256s128s256sH'
+        gw_ip  = socket.gethostbyname(self.extender_vars ['host_name'])
+        gw_int = unpack("!I", socket.inet_aton(gw_ip))[0]
+        fmt    = b'=4sLL64sL6s256s256s128s256sH'
         info   = pack \
             ( fmt
             , magic
             , length
-            , magic2
+            , gw_int
             , self.extender_vars ['host_name']
             , int (self.extender_vars ['port'])
             , b''
