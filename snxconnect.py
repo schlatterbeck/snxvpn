@@ -22,7 +22,7 @@ except ImportError :
 from bs4               import BeautifulSoup
 from getpass           import getpass
 from argparse          import ArgumentParser
-from netrc             import netrc
+from netrc             import netrc, NetrcParseError
 from Crypto.PublicKey  import RSA
 from struct            import pack, unpack
 from subprocess        import Popen, PIPE
@@ -506,7 +506,7 @@ def main () :
         n = a = None
         try :
             n = netrc ()
-        except IOError :
+        except (IOError, NetrcParseError) :
             pass
         if n :
             a = n.authenticators (args.host)
@@ -516,7 +516,7 @@ def main () :
                 args.username = un
             if not args.password :
                 args.password = pw
-        if 'password' not in args :
+        if not args.password :
             password = getpass ('Password: ')
     rq = HTML_Requester (args)
     result = rq.login ()
