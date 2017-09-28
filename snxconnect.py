@@ -517,7 +517,7 @@ def main () :
             if not args.password :
                 args.password = pw
         if not args.password :
-            password = getpass ('Password: ')
+            args.password = getpass ('Password: ')
     rq = HTML_Requester (args)
     result = rq.login ()
     if result :
