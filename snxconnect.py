@@ -203,28 +203,28 @@ class HTML_Requester (object) :
         self.open (data = urlencode (d))
         self.debug (self.purl)
         self.debug (self.info)
-        if 'MultiChallenge' not in self.purl :
-            print ("Login failed (expected MultiChallenge)")
-            self.debug ("Login failed (no MultiChallenge): %s" % self.purl)
+        while 'MultiChallenge' in self.purl :
+            d = self.parse_pw_response ()
+            otp = getpass ('One-time Password: ')
+            d ['password'] = enc.encrypt (otp)
+            self.debug ("nextfile: %s" % self.nextfile)
+            self.debug ("purl: %s" % self.purl)
+            self.open (data = urlencode (d))
+            self.debug ("info: %s" % self.info)
+        if self.purl.endswith ('Portal/Main') :
+            if self.args.save_cookies :
+                self.jar.save (self.args.cookiefile, ignore_discard = True)
+            self.debug ("purl: %s" % self.purl)
+            self.open  ('sslvpn/SNX/extender')
+            self.debug (self.purl)
+            self.debug (self.info)
+            self.parse_extender ()
+            self.generate_snx_info ()
+            return True
+        else :
+            print ("Unexpected response, looking for MultiChallenge or Portal")
+            self.debug ("purl: %s" % self.purl)
             return
-        d = self.parse_pw_response ()
-        otp = getpass ('One-time Password: ')
-        d ['password'] = enc.encrypt (otp)
-        self.debug (self.nextfile)
-        self.open (data = urlencode (d))
-        self.debug (self.info)
-        if not self.purl.endswith ('Portal/Main') :
-            print ("Login failed (expected Portal)")
-            self.debug ("Login failed (expected Portal): %s" % self.purl)
-            return
-        if self.args.save_cookies :
-            self.jar.save (self.args.cookiefile, ignore_discard = True)
-        self.open  ('sslvpn/SNX/extender')
-        self.debug (self.purl)
-        self.debug (self.info)
-        self.parse_extender ()
-        self.generate_snx_info ()
-        return True
     # end def login
 
     def next_file (self, fname) :
