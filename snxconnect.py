@@ -6,9 +6,6 @@ import os.path
 import sys
 import socket
 try :
-    import httplib
-    import urllib2
-    import ssl 
     from urllib2 import build_opener, HTTPCookieProcessor, Request
     from urllib  import urlencode
     from httplib import IncompleteRead
@@ -71,29 +68,6 @@ def iterbytes (x) :
         yield (x [i:i+1])
 # end def iterbytes
 
-class VerifiedHTTPSConnection(httplib.HTTPSConnection):
-    def connect(self):
-        # overrides the version in httplib so that we can fiddle with cert options
-        sock = socket.create_connection((self.host, self.port), self.timeout)
-        if self._tunnel_host:
-            self.sock = sock
-            self._tunnel()
-
-        self.sock = ssl.wrap_socket(sock,
-                                    self.key_file,
-                                    self.cert_file,
-                                    cert_reqs=ssl.CERT_NONE )
-                                    #cert_reqs=ssl.CERT_REQUIRED,
-                                    #ca_certs="PATH_TO_VALID_CA_CRT")
-
-# wraps https connections with ssl certificate verification
-class VerifiedHTTPSHandler(urllib2.HTTPSHandler):
-    def __init__(self, connection_class = VerifiedHTTPSConnection):
-        self.specialized_conn_class = connection_class
-        urllib2.HTTPSHandler.__init__(self)
-    def https_open(self, req):
-        return self.do_open(self.specialized_conn_class, req)
-
 class HTML_Requester (object) :
 
     def __init__ (self, args) :
@@ -108,8 +82,7 @@ class HTML_Requester (object) :
                 j.load (self.args.cookiefile, ignore_discard = True)
             except IOError :
                 self.has_cookies = False
-        https_handler = VerifiedHTTPSHandler()
-        self.opener   = build_opener (https_handler, HTTPCookieProcessor (j))
+        self.opener   = build_opener (HTTPCookieProcessor (j))
         self.nextfile = args.file
     # end def __init__
 
