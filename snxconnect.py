@@ -5,6 +5,7 @@ import os
 import os.path
 import sys
 import socket
+import ssl
 try :
     from urllib2 import build_opener, HTTPCookieProcessor, Request
     from urllib  import urlencode
@@ -75,6 +76,17 @@ class HTML_Requester (object) :
         self.exponent    = None
         self.args        = args
         self.jar         = j = LWPCookieJar ()
+
+        if self.args.skip_cert:
+            try:
+                _create_unverified_https_context = ssl._create_unverified_context
+            except AttributeError:
+                # Legacy Python that doesn't verify HTTPS certificates by default
+                pass
+            else:
+                # Handle target environment that doesn't support HTTPS verification
+                ssl._create_default_https_context = _create_unverified_https_context
+
         self.has_cookies = False
         if self.args.cookiefile :
             self.has_cookies = True
@@ -84,6 +96,7 @@ class HTML_Requester (object) :
                 self.has_cookies = False
         self.opener   = build_opener (HTTPCookieProcessor (j))
         self.nextfile = args.file
+
     # end def __init__
 
     def call_snx (self) :
@@ -203,14 +216,23 @@ class HTML_Requester (object) :
         self.open (data = urlencode (d))
         self.debug (self.purl)
         self.debug (self.info)
-        while 'MultiChallenge' in self.purl :
-            d = self.parse_pw_response ()
-            otp = getpass ('One-time Password: ')
-            d ['password'] = enc.encrypt (otp)
-            self.debug ("nextfile: %s" % self.nextfile)
+        
+        if self.args.multi_challenge :
+            while 'MultiChallenge' in self.purl :
+                d = self.parse_pw_response ()
+                otp = getpass ('One-time Password: ')
+                d ['password'] = enc.encrypt (otp)
+                self.debug ("nextfile: %s" % self.nextfile)
+                self.debug ("purl: %s" % self.purl)
+                self.open (data = urlencode (d))
+                self.debug ("info: %s" % self.info)
+
+        if self.purl.endswith ('Login/ActivateLogin') :
+            if self.args.save_cookies :
+                self.jar.save (self.args.cookiefile, ignore_discard = True)
             self.debug ("purl: %s" % self.purl)
-            self.open (data = urlencode (d))
-            self.debug ("info: %s" % self.info)
+            self.open('sslvpn/Login/ActivateLogin?ActivateLogin=activate&LangSelect=en_US&submit=Continue&HeightData=')
+
         if self.purl.endswith ('Portal/Main') :
             if self.args.save_cookies :
                 self.jar.save (self.args.cookiefile, ignore_discard = True)
@@ -222,7 +244,7 @@ class HTML_Requester (object) :
             self.generate_snx_info ()
             return True
         else :
-            print ("Unexpected response, looking for MultiChallenge or Portal")
+            print ("Unexpected response, try again.")
             self.debug ("purl: %s" % self.purl)
             return
     # end def login
@@ -405,7 +427,7 @@ def main () :
         except (OSError, IOError) :
             pass
     cfg = {}
-    boolopts = ['debug', 'save_cookies']
+    boolopts = ['debug', 'save_cookies', 'multi_challenge', 'skip_cert']
     if cfgf :
         for line in cfgf :
             line = line.strip ().decode ('utf-8')
@@ -456,6 +478,11 @@ def main () :
         , default = cfg.get ('login_type', 'Standard')
         )
     cmd.add_argument \
+        ( '-MC', '--multi-challenge'
+        , help    = 'MultiChallenge, default="%(default)s"'
+        , default = cfg.get ('multi_challenge', False)
+        )
+    cmd.add_argument \
         ( '-P', '--password'
         , help    = 'Login password, not a good idea to specify on commandline'
         , default = cfg.get ('password', None)
@@ -498,6 +525,12 @@ def main () :
         , help    = 'Display version and exit'
         , action  = 'store_true'
         )
+    cmd.add_argument \
+        ( '-SC', '--skip-cert'
+        , help    = 'Skip certificate verification'
+        , action='store_true'
+        )
+
     args = cmd.parse_args ()
     if args.version :
         print ("snxconnect version %s by Ralf Schlatterbeck" % VERSION)
