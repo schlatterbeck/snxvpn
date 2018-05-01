@@ -216,14 +216,16 @@ class HTML_Requester (object) :
         self.open (data = urlencode (d))
         self.debug (self.purl)
         self.debug (self.info)
-        while 'MultiChallenge' in self.purl :
-            d = self.parse_pw_response ()
-            otp = getpass ('One-time Password: ')
-            d ['password'] = enc.encrypt (otp)
-            self.debug ("nextfile: %s" % self.nextfile)
-            self.debug ("purl: %s" % self.purl)
-            self.open (data = urlencode (d))
-            self.debug ("info: %s" % self.info)
+        #while 'MultiChallenge' in self.purl :
+         #   d = self.parse_pw_response ()
+          #  otp = getpass ('One-time Password: ')
+           # d ['password'] = enc.encrypt (otp)
+           # self.debug ("nextfile: %s" % self.nextfile)
+           # self.debug ("purl: %s" % self.purl)
+           # self.open (data = urlencode (d))
+          #  self.debug ("info: %s" % self.info)
+
+        self.open('sslvpn/Login/ActivateLogin?ActivateLogin=activate&LangSelect=en_US&submit=Continue&HeightData=')
         if self.purl.endswith ('Portal/Main') :
             if self.args.save_cookies :
                 self.jar.save (self.args.cookiefile, ignore_discard = True)
