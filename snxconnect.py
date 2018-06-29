@@ -5,16 +5,16 @@ import os
 import os.path
 import sys
 import socket
+import rsa
 try :
-    from urllib2 import build_opener, HTTPCookieProcessor, Request
+    from urllib2 import build_opener, HTTPCookieProcessor, Request, HTTPSHandler
+    import ssl
     from urllib  import urlencode
     from httplib import IncompleteRead
-    rsatype = long
 except ImportError :
-    from urllib.request import build_opener, HTTPCookieProcessor, Request
+    from urllib.request import build_opener, HTTPCookieProcessor, Request, HTTPSHandler
     from urllib.parse   import urlencode
     from http.client    import IncompleteRead
-    rsatype = int
 try :
     from cookielib import LWPCookieJar
 except ImportError :
@@ -23,7 +23,6 @@ from bs4               import BeautifulSoup
 from getpass           import getpass
 from argparse          import ArgumentParser
 from netrc             import netrc, NetrcParseError
-from Crypto.PublicKey  import RSA
 from struct            import pack, unpack
 from subprocess        import Popen, PIPE
 from snxvpnversion     import VERSION
@@ -76,13 +75,19 @@ class HTML_Requester (object) :
         self.args        = args
         self.jar         = j = LWPCookieJar ()
         self.has_cookies = False
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
         if self.args.cookiefile :
             self.has_cookies = True
             try :
                 j.load (self.args.cookiefile, ignore_discard = True)
             except IOError :
                 self.has_cookies = False
-        self.opener   = build_opener (HTTPCookieProcessor (j))
+        handlers = [HTTPCookieProcessor (j)]
+        if self.args.ssl_noverify:
+            handlers.append(HTTPSHandler(context=context))
+        self.opener   = build_opener (*handlers)
         self.nextfile = args.file
     # end def __init__
 
@@ -191,22 +196,27 @@ class HTML_Requester (object) :
                 break
         self.debug (self.nextfile)
 
-        enc = PW_Encode (modulus = self.modulus, exponent = self.exponent)
+        self.debug(self.purl)
+        password =  rsa.pkcs1.encrypt(self.args.password, rsa.PublicKey(self.modulus, self.exponent))
+        password = ''.join ('%02x' % b_ord (c) for c in reversed (password))
         d = dict \
-            ( password      = enc.encrypt (self.args.password)
+            ( password      = password 
             , userName      = self.args.username
             , selectedRealm = self.args.realm
             , loginType     = self.args.login_type
             , vpid_prefix   = self.args.vpid_prefix
             , HeightData    = self.args.height_data
             )
+        self.debug (urlencode(d))
         self.open (data = urlencode (d))
         self.debug (self.purl)
         self.debug (self.info)
         while 'MultiChallenge' in self.purl :
             d = self.parse_pw_response ()
             otp = getpass ('One-time Password: ')
-            d ['password'] = enc.encrypt (otp)
+            otp =  rsa.pkcs1.encrypt(self.args.password, rsa.PublicKey(self.modulus, self.exponent))
+            otp = ''.join ('%02x' % b_ord (c) for c in reversed (otp))
+            d ['password'] = otp
             self.debug ("nextfile: %s" % self.nextfile)
             self.debug ("purl: %s" % self.purl)
             self.open (data = urlencode (d))
@@ -224,6 +234,9 @@ class HTML_Requester (object) :
         else :
             print ("Unexpected response, looking for MultiChallenge or Portal")
             self.debug ("purl: %s" % self.purl)
+            self.debug (getattr(self.soup.find('span', attrs={'class': 'errorMessage'}), 'string', ''))
+            if not self.soup.find('span', attrs={'class': 'errorMessage'}):
+                self.debug(self.soup)
             return
     # end def login
 
@@ -331,69 +344,12 @@ class HTML_Requester (object) :
             print ('No RSA parameters found, cannot login')
             return
         self.debug (repr (vars))
-        self.modulus  = rsatype (vars ['modulus'],  16)
-        self.exponent = rsatype (vars ['exponent'], 16)
+        self.modulus  = int (vars ['modulus'], 16)
+        self.exponent = int (vars ['exponent'], 16)
+
     # end def parse_rsa_params
 
 # end class HTML_Requester
-
-class PW_Encode (object) :
-    """ RSA encryption module with special padding and reversing to be
-        compatible with checkpoints implementation.
-        Test with non-random padding to get known value:
-        >>> p = PW_Encode (testing = True)
-        >>> print (p.encrypt ('xyzzy'))
-        451c2d5b491ee22d6f7cdc5a20f320914668f8e01337625dfb7e0917b16750cfbafe38bfcb68824b30d5cc558fa1c6d542ff12ac8e1085b7a9040f624ab39f625cabd77d1d024c111e42fede782e089400d2c9b1d6987c0005698178222e8500243f12762bebba841eae331d17b290f80bca6c3f8a49522fb926646c24db3627
-        >>> print (p.encrypt ('XYZZYxyzzyXYZZYxyzzy'))
-        a529e86cf80dd131e3bdae1f6dbab76f67f674e42041dde801ebdb790ab0637d56cc82f52587f2d4d34d26c490eee3a1ebfd80df18ec41c4440370b1ecb2dec3f811e09d2248635dd8aab60a97293ec0315a70bf024b33e8a8a02582fbabc98dd72d913530151e78b47119924f45b711b9a1189d5eec5a20e6f9bc1d44bfd554
-    """
-
-    def __init__ (self, modulus = None, exponent = None, testing = False) :
-        m = rsatype \
-            ( b'c87e9e96ffde3ec47c3f116ea5ac0e15'
-              b'34490b3da6dbbedae1af50dc32bf1012'
-              b'bdb7e1ff67237e0302b48c8731f343ff'
-              b'644662de2bb21d2b033127660e525d58'
-              b'889f8f6f05744906dddc8f4b85e0916b'
-              b'5d9cf5b87093ed260238674f143801b7'
-              b'e58a18795adc9acefaf0f378326fea19'
-              b'9ac6e5a88be83a52d4a77b3bba5f1aed'
-            , 16
-            )
-        e = rsatype (b'010001', 16)
-        m = modulus  or m
-        e = exponent or e
-        self.pubkey  = RSA.construct ((m, e))
-        self.testing = testing
-    # end def __init__
-
-    def pad (self, txt) :
-        l = (self.pubkey.size () + 7) >> 3
-        r = []
-        r.append (b'\0')
-        # Note that first reversing and then encoding to utf-8 would
-        # *not* be correct!
-        for x in iterbytes (reversed (txt.encode ('utf-8'))) :
-            r.append (x)
-        r.append (b'\0')
-        n = l - len (r) - 2
-        if self.testing :
-            r.append (b'\1' * n)
-        else :
-            r.append (os.urandom (n))
-        r.append (b'\x02')
-        r.append (b'\x00')
-        return b''.join (reversed (r))
-    # end def pad
-
-    def encrypt (self, password) :
-        x = self.pad (password)
-        e = self.pubkey.encrypt (x, '')[0]
-        e = ''.join ('%02x' % b_ord (c) for c in reversed (e))
-        return e
-    # end def encrypt
-
-# end class PW_Encode
 
 def main () :
     # First try to parse config-file ~/.snxvpnrc:
@@ -444,6 +400,12 @@ def main () :
         , help     = 'Host part of URL default="%(default)s"'
         , default  = host
         , required = not host
+        )
+    cmd.add_argument \
+        ( '--ssl-noverify'
+        , help     = 'Skip SSL verification default="%(default)s"'
+        , default  = False
+        , required = False
         )
     cmd.add_argument \
         ( '--height-data'
