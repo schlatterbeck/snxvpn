@@ -380,7 +380,7 @@ class PW_Encode (object) :
         if self.testing :
             r.append (b'\1' * n)
         else :
-            r.append (os.urandom (n))
+            r.append (bytes([x % 255 + 1 for x in os.urandom (n)]))
         r.append (b'\x02')
         r.append (b'\x00')
         return b''.join (reversed (r))
