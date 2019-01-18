@@ -20,8 +20,6 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 # ****************************************************************************
 
-from snxvpnversion import VERSION
-
 from distutils.core import setup, Extension
 license = 'BSD License'
 
@@ -34,7 +32,6 @@ f.close ()
 setup \
     ( name             = "snxvpn"
     , py_modules       = ['snxconnect', 'snxvpnversion']
-    , version          = VERSION
     , description      =
         "Command-line utility to connect to a Checkpoint SSL VPN "
     , long_description = ''.join (description)
@@ -44,7 +41,7 @@ setup \
     , platforms        = 'Linux'
     , url              = "https://github.com/schlatterbeck/snxvpn"
     , scripts          = ['snxconnect']
-    , install_requires = [ 'bs4', 'pycrypto', 'lxml' ]
+    , install_requires = [ 'bs4', 'pycrypto', 'lxml', 'Crypto']
     , classifiers      = \
         [ 'Development Status :: 3 - Alpha'
         , 'License :: OSI Approved :: ' + license

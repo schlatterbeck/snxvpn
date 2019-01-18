@@ -9,3 +9,6 @@ announce_pypi
 upload_pypi
 dist
 snxanswer
+
+# IDE ignore
+.idea
