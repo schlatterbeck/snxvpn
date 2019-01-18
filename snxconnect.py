@@ -329,35 +329,8 @@ class HTMLRequester(object):
 # end class HTML_Requester
 
 class PW_Encode(object):
-    """ RSA encryption module with special padding and reversing to be
-        compatible with checkpoints implementation.
-        Test with non-random padding to get known value:
-        >>> p = PW_Encode (testing = True)
-        >>> print (p.encrypt ('xyzzy'))
-        451c2d5b491ee22d6f7cdc5a20f320914668f8e01337625dfb7e0917b16750cfbafe38bfcb68824b30d5cc558fa1c6d542ff12ac8e1085b7a9040f624ab39f625cabd77d1d024c111e42fede782e089400d2c9b1d6987c0005698178222e8500243f12762bebba841eae331d17b290f80bca6c3f8a49522fb926646c24db3627
-        >>> print (p.encrypt ('XYZZYxyzzyXYZZYxyzzy'))
-        a529e86cf80dd131e3bdae1f6dbab76f67f674e42041dde801ebdb790ab0637d56cc82f52587f2d4d34d26c490eee3a1ebfd80df18ec41c4440370b1ecb2dec3f811e09d2248635dd8aab60a97293ec0315a70bf024b33e8a8a02582fbabc98dd72d913530151e78b47119924f45b711b9a1189d5eec5a20e6f9bc1d44bfd554
-    """
-
-    def __init__(self, modulus=None, exponent=None, testing=False):
-        m = rsatype \
-            (b'c87e9e96ffde3ec47c3f116ea5ac0e15'
-             b'34490b3da6dbbedae1af50dc32bf1012'
-             b'bdb7e1ff67237e0302b48c8731f343ff'
-             b'644662de2bb21d2b033127660e525d58'
-             b'889f8f6f05744906dddc8f4b85e0916b'
-             b'5d9cf5b87093ed260238674f143801b7'
-             b'e58a18795adc9acefaf0f378326fea19'
-             b'9ac6e5a88be83a52d4a77b3bba5f1aed'
-             , 16
-             )
-        e = rsatype(b'010001', 16)
-        m = modulus or m
-        e = exponent or e
-        self.pubkey = RSA.construct((m, e))
-        self.testing = testing
-
-    # end def __init__
+    def __init__(self, modulus=None, exponent=None):
+        self.pubkey = RSA.construct((modulus, exponent))
 
     def pad(self, txt):
         l = (self.pubkey.size() + 7) >> 3
