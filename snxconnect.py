@@ -5,8 +5,10 @@ import os
 import os.path
 import sys
 import socket
+import rsa
+import ssl
 
-from urllib.request import build_opener, HTTPCookieProcessor, Request
+from urllib.request import build_opener, HTTPCookieProcessor, Request, HTTPSHandler
 from urllib.parse import urlencode
 from http.client import IncompleteRead
 from http.cookiejar import LWPCookieJar
@@ -14,7 +16,6 @@ from bs4 import BeautifulSoup
 from getpass import getpass
 from argparse import ArgumentParser
 from netrc import netrc, NetrcParseError
-from Crypto.PublicKey import RSA
 from struct import pack, unpack
 from subprocess import Popen, PIPE
 
@@ -44,13 +45,19 @@ class HTMLRequester(object):
         self.args = args
         self.jar = j = LWPCookieJar()
         self.has_cookies = False
+        context = ssl.create_default_context()
+
         if self.args.cookiefile:
             self.has_cookies = True
             try:
                 j.load(self.args.cookiefile, ignore_discard=True)
             except IOError:
                 self.has_cookies = False
-        self.opener = build_opener(HTTPCookieProcessor(j))
+
+        handlers = [HTTPCookieProcessor(j)]
+        if self.args.ssl_noverify:
+            handlers.append(HTTPSHandler(context=context))
+        self.opener = build_opener(*handlers)
         self.nextfile = args.file
 
     # end def __init__
@@ -124,6 +131,10 @@ class HTMLRequester(object):
 
     # end def generate_snx_info
 
+    def rsa_encrypt(self, value):
+        result = rsa.pkcs1.encrypt(value.encode('ascii'), rsa.PublicKey(self.modulus, self.exponent))
+        return ''.join('%02x' % c for c in reversed(result))
+
     def login(self):
         if self.has_cookies:
             self.debug("has cookie")
@@ -162,10 +173,10 @@ class HTMLRequester(object):
                 assert form['method'] == 'post'
                 break
         self.debug(self.nextfile)
+        self.debug(self.purl)
 
-        enc = PW_Encode(modulus=self.modulus, exponent=self.exponent)
         d = dict(
-            password=enc.encrypt(self.args.password),
+            password=self.rsa_encrypt(self.args.password),
             userName=self.args.username,
             selectedRealm=self.args.realm,
             loginType=self.args.login_type,
@@ -178,7 +189,7 @@ class HTMLRequester(object):
         while 'MultiChallenge' in self.purl:
             d = self.parse_pw_response()
             otp = getpass('One-time Password: ')
-            d['password'] = enc.encrypt(otp)
+            d['password'] = self.rsa_encrypt(otp)
             self.debug("nextfile: %s" % self.nextfile)
             self.debug("purl: %s" % self.purl)
             self.open(data=urlencode(d))
@@ -323,39 +334,7 @@ class HTMLRequester(object):
         self.exponent = int(vars['exponent'], 16)
     # end def parse_rsa_params
 
-
 # end class HTML_Requester
-
-class PW_Encode(object):
-    def __init__(self, modulus=None, exponent=None):
-        self.pubkey = RSA.construct((modulus, exponent))
-
-    def pad(self, txt):
-        l = (self.pubkey.size() + 7) >> 3
-        r = list()
-        r.append(b'\0')
-        # Note that first reversing and then encoding to utf-8 would
-        # *not* be correct!
-        for x in iter_bytes(reversed(txt.encode('utf-8'))):
-            r.append(x)
-        r.append(b'\0')
-        n = l - len(r) - 2
-        r.append(bytes([x % 255 + 1 for x in os.urandom (n)]))
-        r.append(b'\x02')
-        r.append(b'\x00')
-        return b''.join(reversed(r))
-
-    # end def pad
-
-    def encrypt(self, password):
-        x = self.pad(password)
-        e = self.pubkey.encrypt(x, '')[0]
-        e = ''.join('%02x' % c for c in reversed(e))
-        return e
-    # end def encrypt
-
-
-# end class PW_Encode
 
 def main():
     # First try to parse config-file ~/.snxvpnrc:
@@ -392,6 +371,8 @@ def main():
                      help='File part of URL default="%(default)s"', default=cfg.get('file', 'Login/Login'))
     cmd.add_argument('-H', '--host',
                      help='Host part of URL default="%(default)s"', default=host, required=not host)
+    cmd.add_argument('--ssl-noverify',
+                     help='Skip SSL verification default="%(default)s"', default=cfg.get('ssl_noverify', False))
     cmd.add_argument('--height-data',
                      help='Height data in form, default "%(default)s"', default=cfg.get('height_data', ''))
     cmd.add_argument('-L', '--login-type',
