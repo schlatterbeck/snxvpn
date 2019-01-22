@@ -18,8 +18,6 @@ from Crypto.PublicKey import RSA
 from struct import pack, unpack
 from subprocess import Popen, PIPE
 
-rsatype = int
-
 """ Todo:
     - timeout can be retrieved at /Portal/LoggedIn
       Function to do this is RetrieveTimeoutVal (url_above) in portal
@@ -321,8 +319,8 @@ class HTMLRequester(object):
             print('No RSA parameters found, cannot login')
             return
         self.debug(repr(vars))
-        self.modulus = rsatype(vars['modulus'], 16)
-        self.exponent = rsatype(vars['exponent'], 16)
+        self.modulus = int(vars['modulus'], 16)
+        self.exponent = int(vars['exponent'], 16)
     # end def parse_rsa_params
 
 
