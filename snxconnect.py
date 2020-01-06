@@ -197,7 +197,7 @@ class HTML_Requester (object) :
         self.debug (self.nextfile)
 
         self.debug(self.purl)
-        password =  rsa.pkcs1.encrypt(self.args.password, rsa.PublicKey(self.modulus, self.exponent))
+        password =  rsa.pkcs1.encrypt(self.args.password.encode('UTF-8'), rsa.PublicKey(self.modulus, self.exponent))
         password = ''.join ('%02x' % b_ord (c) for c in reversed (password))
         d = dict \
             ( password      = password 
