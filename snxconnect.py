@@ -6,9 +6,9 @@ import os.path
 import sys
 import socket
 import rsa
+import ssl
 try :
     from urllib2 import build_opener, HTTPCookieProcessor, Request, HTTPSHandler
-    import ssl
     from urllib  import urlencode
     from httplib import IncompleteRead
 except ImportError :
