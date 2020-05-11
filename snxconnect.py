@@ -286,12 +286,13 @@ class HTML_Requester (object) :
             program via a socket.
         """
         for script in self.soup.find_all ('script') :
-            if '/* Extender.user_name' in script.text :
+            text = script.text or script.string or ""
+            if '/* Extender.user_name' in text :
                 break
         else :
             print ("Error retrieving extender variables")
             return
-        for line in script.text.split ('\n') :
+        for line in text.split ('\n') :
             if '/* Extender.user_name' in line :
                 break
         stmts = line.split (';')
