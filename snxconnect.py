@@ -173,6 +173,7 @@ class HTML_Requester (object) :
                 self.jar.clear ()
                 self.next_file (self.purl)
         self.debug (self.nextfile)
+        print ('Visiting login page ...')
         self.open ()
         self.debug (self.purl)
         # Get the RSA parameters from the javascript in the received html
@@ -184,6 +185,7 @@ class HTML_Requester (object) :
         else :
             print ('No RSA javascript file found, cannot login')
             return
+        print ('Fetching RSA javascript file ...')
         self.open (do_soup = False)
         self.parse_rsa_params ()
         if not self.modulus :
@@ -208,6 +210,7 @@ class HTML_Requester (object) :
             , HeightData    = self.args.height_data
             )
         self.debug (urlencode(d))
+        print ("Sending login information ...")
         self.open (data = urlencode (d))
         self.debug (self.purl)
         self.debug (self.info)
@@ -231,6 +234,7 @@ class HTML_Requester (object) :
             if self.args.save_cookies :
                 self.jar.save (self.args.cookiefile, ignore_discard = True)
             self.debug ("purl: %s" % self.purl)
+            print ("Fetching extender information ...")
             self.open  (self.args.extender)
             self.debug (self.purl)
             self.debug (self.info)
