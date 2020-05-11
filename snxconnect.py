@@ -211,6 +211,12 @@ class HTML_Requester (object) :
         self.open (data = urlencode (d))
         self.debug (self.purl)
         self.debug (self.info)
+
+        errorMessage = self.soup.select_one(".errorMessage")
+        if errorMessage :
+            print ("Error: %s" % errorMessage.string)
+            return
+
         while 'MultiChallenge' in self.purl :
             d = self.parse_pw_response ()
             otp = getpass ('One-time Password: ')
