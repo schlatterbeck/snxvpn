@@ -205,8 +205,14 @@ class HTMLRequester(object):
             self.generate_snx_info()
             return True
         elif self.purl.endswith('Login/Login'):
-            for error in self.soup.find(id='ErrorMsg').find_all('span'):
-                print("Error response: %s" % error.string)
+            errorMsg = self.soup.find(id='ErrorMsg')
+            if errorMsg is None:
+                errorMsg = self.soup.find(id='errorMsgDIV')
+            if errorMsg is not None:
+                for error in errorMsg.find_all('span'):
+                    print("Error response: %s" % error.string)
+            else:
+                print("Error response: %s" % self.soup)
             return
         else:
             print("Unexpected response, looking for MultiChallenge or Portal")
