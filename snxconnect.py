@@ -122,6 +122,7 @@ class HTML_Requester (object) :
         try:
             answer = sock.recv (4096) # should block until snx dies
         except KeyboardInterrupt:
+            print ('\b\b\r')
             print ("Shutting down ...")
             try:
                 sys.exit(0)
