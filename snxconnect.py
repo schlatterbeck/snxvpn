@@ -119,7 +119,14 @@ class HTML_Requester (object) :
             f.write (answer)
             f.close ()
         print ("SNX connected, to leave VPN open, leave this running!")
-        answer = sock.recv (4096) # should block until snx dies
+        try:
+            answer = sock.recv (4096) # should block until snx dies
+        except KeyboardInterrupt:
+            print ("Shutting down ...")
+            try:
+                sys.exit(0)
+            except SystemExit:
+                os._exit(0)
     # end def call_snx
 
     def debug (self, s) :
