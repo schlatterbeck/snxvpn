@@ -7,6 +7,7 @@ import sys
 import socket
 import rsa
 import ssl
+import time
 try :
     from urllib2 import build_opener, HTTPCookieProcessor, Request, HTTPSHandler
     from urllib  import urlencode
@@ -120,7 +121,9 @@ class HTML_Requester (object) :
             f.close ()
         print ("SNX connected, to leave VPN open, leave this running!")
         try:
-            answer = sock.recv (4096) # should block until snx dies
+            while True:
+                time.sleep(4000000)
+            # answer = sock.recv (4096) # should block until snx dies
         except KeyboardInterrupt:
             sys.stdout.write ('\b\b\r')
             sys.stdout.flush()
