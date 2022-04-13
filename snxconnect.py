@@ -281,7 +281,7 @@ class HTML_Requester (object) :
         url = '/'.join (('%s:/' % self.args.protocol, self.args.host, filepart))
         if data :
             data = data.encode ('ascii')
-        rq = Request (url, data)
+        rq = Request (url, data, headers={'User-Agent': self.args.useragent})
         self.f = f = self.opener.open (rq, timeout = 10)
         if do_soup :
             # Sometimes we get incomplete read. So we read everything
@@ -473,6 +473,11 @@ def main () :
         , help    = 'snx binary to call, default="%(default)s", you might'
                     ' want a full path here'
         , default = cfg.get ('snxpath', 'snx')
+        )
+    cmd.add_argument \
+        ( '-u', '--useragent'
+        , help    = 'User-Agent to be passed to Checkpoint Portal, default="%(default)s"'
+        , default = cfg.get ('useragent', 'Mozilla/5.0 (X11; Linux x86_64; rv:100.0) Gecko/20100101 Firefox/100.0')
         )
     cmd.add_argument \
         ( '-U', '--username'
